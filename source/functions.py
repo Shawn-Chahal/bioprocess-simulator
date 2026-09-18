@@ -1,27 +1,26 @@
 import numpy as np
-from scipy import optimize
+from scipy.special import lambertw
 
 from source.constants import *
 
 
-def f_ph(ph, sigma, mu):
-    return np.exp(-(ph - mu) ** 2 / (2 * sigma ** 2))
+def f_ph(ph, ph_opt, ph_sd):
+    return np.exp(-(ph - ph_opt) ** 2 / (2 * ph_sd ** 2))
 
 
-def f_temp(temp, b, c, temp_min, temp_max):
-    res = optimize.minimize_scalar(neg_u_temp, args=(b, c, temp_min, temp_max), bounds=(temp_min, temp_max))
-    norm_u_temp = u_temp(temp, b, c, temp_min, temp_max) / (-res.fun)
-    norm_u_temp = np.where(temp > temp_max, 0, norm_u_temp)
-    return norm_u_temp
+def f_temp(temp, k_t, temp_min, temp_max):
+    # TODO: Replace k_t with temp_opt and reparameterize
+    z = 2 * np.exp(2 + k_t * (temp_max - temp_min))
+    w = np.real(lambertw(z))
+    t_opt = temp_min + (w - 2) / k_t
+    f_temp_max = ((t_opt - temp_min) ** 2) * (1 - np.exp(k_t * (t_opt - temp_max)))
 
+    f_temp_ = ((temp - temp_min) ** 2) * (1 - np.exp(k_t * (temp - temp_max)))
+    f_temp_ = f_temp_ / f_temp_max
+    f_temp_ = np.where(temp > temp_min, f_temp_, 0)
+    f_temp_ = np.where(temp < temp_max, f_temp_, 0)
 
-def u_temp(temp, b, c, temp_min, temp_max):
-    u = ((b * (temp - temp_min)) ** 2) * (1 - np.exp(c * (temp - temp_max)))
-    return u
-
-
-def neg_u_temp(temp, b, c, temp_min, temp_max):
-    return -u_temp(temp, b, c, temp_min, temp_max)
+    return f_temp_
 
 
 def f_glc(c_glc):
@@ -66,22 +65,22 @@ def lac_switch(c_lac, c_glc):
 
 
 def spec_growth(ph, temp, c_glc, c_gln, c_lac, c_amm, x_v, mode=2):
-    u_ph = f_ph(ph, 1, 7)
-    norm_u_temp = f_temp(temp, 0.035, 0.7, 0, 40)
+    f_ph_ = f_ph(ph, ph_opt=7, ph_sd=1)
+    f_temp_ = f_temp(temp, k_t=0.7, temp_min=0, temp_max=40)
     u_glc = f_glc(c_glc)
     u_gln = f_gln(c_gln)
     u_lac = f_lac(c_lac, c_glc)
     u_amm = f_amm(c_amm)
     u_cd = f_cd(x_v)
     if mode == 1:
-        return U_MAX * u_ph * norm_u_temp * u_glc * u_gln * u_lac * u_amm * u_cd
+        return U_MAX * f_ph_ * f_temp_ * u_glc * u_gln * u_lac * u_amm * u_cd
     elif mode == 2:
-        return U_MAX * u_ph * norm_u_temp * (u_glc + u_gln) * u_lac * u_amm * u_cd
+        return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln) * u_lac * u_amm * u_cd
     elif mode == 3:
         if c_glc > 0.4:
-            return U_MAX * u_ph * norm_u_temp * (u_glc + u_gln) * u_lac * u_amm * u_cd
+            return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln) * u_lac * u_amm * u_cd
         else:
-            return U_MAX * u_ph * norm_u_temp * (u_glc + u_gln + u_lac) * u_amm * u_cd
+            return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln + u_lac) * u_amm * u_cd
     else:
         return None
 
