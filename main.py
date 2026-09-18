@@ -16,7 +16,7 @@ c_lac_0 = 0  # mM
 c_lac = [c_lac_0]
 c_amm_0 = 0  # mM
 c_amm = [c_amm_0]
-x_0 = 10 ** 6  # cells/ml
+x_0 = 1.0 * 10 ** 6  # cells/ml
 x_v = [x_0]
 x_t = [x_0]
 t_0 = 0
@@ -28,19 +28,15 @@ while t[-1] < t_f:
     k_lag = np.log(1 - STEADY_STATE_FRAC) / (-LAG_TIME)
     alpha = 1 - np.exp(-k_lag * t[-1])
 
-    mu = func.specific_growth_rate(ph, temp, c_glc[-1], c_gln[-1], c_lac[-1], c_amm[-1], x_v[-1])
+    mu, alpha_sgr = func.specific_growth_rate(ph, temp, c_glc[-1], c_gln[-1], c_lac[-1], c_amm[-1], x_v[-1])
     k_d = func.specific_death_rate(c_lac[-1], c_amm[-1], c_gln[-1])
 
     d_x_v = alpha * func.ddt_x_v(mu, k_d, x_v[-1])
     d_x_t = alpha * func.ddt_x_t(mu, x_v[-1])
-    d_glc = alpha * func.ddt_glc(mu, x_v[-1])
+    d_glc = alpha * func.ddt_glc(mu, x_v[-1], alpha_sgr)
     d_gln = alpha * func.ddt_gln(mu, x_v[-1], c_gln[-1])
-    d_lac = alpha * func.ddt_lac(c_lac[-1], c_glc[-1], mu, x_v[-1])
+    d_lac = alpha * func.ddt_lac(c_lac[-1], c_glc[-1], mu, x_v[-1], alpha_sgr)
     d_amm = alpha * func.ddt_amm(mu, x_v[-1], c_gln[-1])
-
-    # print(f"t = {t[-1]:6.0f} | mu = {mu:6.3E} | k_d = {k_d:6.3E} | d_x_v = {d_x_v:6.3E} | "
-    #       f"d_glc = {d_glc:6.3E} | d_gln = {d_gln:6.3E} | d_lac = {d_lac:6.3E} | d_amm = {d_amm:6.3E} | "
-    #       f"c_glc = {c_glc[-1]:6.3f} | c_gln = {c_gln[-1]:6.3f} | c_lac = {c_lac[-1]:6.3f} | c_amm = {c_amm[-1]:6.3f}")
 
     # Euler's method
     x_v_next = max(0, x_v[-1] + d_x_v * dt)
