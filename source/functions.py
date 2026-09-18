@@ -23,33 +23,29 @@ def f_temp(temp, k_t, temp_min, temp_max):
     return f_temp_
 
 
-def f_glc(c_glc):
-    return c_glc / (K_SS + c_glc)
+def f_s_glc(c_glc):
+    return c_glc / (K_S_GLC + c_glc)
 
 
-def f_gln(c_gln):
-    return c_gln / (K_SN + c_gln)
+def f_s_gln(c_gln):
+    return c_gln / (K_S_GLN + c_gln)
 
 
-def f_lac(c_lac, c_glc, mode=1):
-    # print(K_IL / (K_IL + c_lac), lac_switch(c_lac, c_glc))
-    if mode == 1:
-        return K_IL / (K_IL + c_lac)
-    elif mode == 2:
-        return (K_IL / (K_IL + c_lac)) * lac_switch(c_lac, c_glc)
-    else:
-        return None
+def f_s_lac(c_lac):
+    return c_lac / (K_S_LAC + c_lac)
 
 
-def f_amm(c_amm):
-    return K_IM / (K_IM + c_amm)
+def f_i_lac(c_lac):
+    return K_I_LAC / (K_I_LAC + c_lac)
 
 
-def f_cd(x_v):
-    if x_v > X_M:
-        return 0
-    else:
-        return (x_v / (K_X + x_v)) * (1 - x_v / X_M) ** N
+def f_i_amm(c_amm):
+    return K_I_AMM / (K_I_AMM + c_amm)
+
+
+def f_x(x_v):
+    x_v_ = np.clip(x_v, 0, X_M)
+    return (x_v_ / (K_X + x_v_)) * (1 - x_v_ / X_M) ** N
 
 
 def beta(c_glc):
@@ -67,20 +63,20 @@ def lac_switch(c_lac, c_glc):
 def spec_growth(ph, temp, c_glc, c_gln, c_lac, c_amm, x_v, mode=2):
     f_ph_ = f_ph(ph, ph_opt=7, ph_sd=1)
     f_temp_ = f_temp(temp, k_t=0.7, temp_min=0, temp_max=40)
-    u_glc = f_glc(c_glc)
-    u_gln = f_gln(c_gln)
-    u_lac = f_lac(c_lac, c_glc)
-    u_amm = f_amm(c_amm)
-    u_cd = f_cd(x_v)
+    f_s_glc_ = f_s_glc(c_glc)
+    f_s_gln_ = f_s_gln(c_gln)
+    f_i_lac_ = f_i_lac(c_lac)
+    f_i_amm_ = f_i_amm(c_amm)
+    f_x_ = f_x(x_v)
     if mode == 1:
-        return U_MAX * f_ph_ * f_temp_ * u_glc * u_gln * u_lac * u_amm * u_cd
+        return U_MAX * f_ph_ * f_temp_ * f_s_glc_ * f_s_gln_ * f_i_lac_ * f_i_amm_ * f_x_
     elif mode == 2:
-        return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln) * u_lac * u_amm * u_cd
+        return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_) * f_i_lac_ * f_i_amm_ * f_x_
     elif mode == 3:
         if c_glc > 0.4:
-            return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln) * u_lac * u_amm * u_cd
+            return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_) * f_i_lac_ * f_i_amm_ * f_x_
         else:
-            return U_MAX * f_ph_ * f_temp_ * (u_glc + u_gln + u_lac) * u_amm * u_cd
+            return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_ + f_i_lac_) * f_i_amm_ * f_x_
     else:
         return None
 
