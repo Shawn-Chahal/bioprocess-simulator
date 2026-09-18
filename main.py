@@ -28,8 +28,8 @@ while t[-1] < t_f:
     k_lag = np.log(1 - STEADY_STATE_FRAC) / (-LAG_TIME)
     alpha = 1 - np.exp(-k_lag * t[-1])
 
-    mu = func.spec_growth(ph, temp, c_glc[-1], c_gln[-1], c_lac[-1], c_amm[-1], x_v[-1])
-    k_d = func.spec_death(c_lac[-1], c_amm[-1], c_gln[-1])
+    mu = func.specific_growth_rate(ph, temp, c_glc[-1], c_gln[-1], c_lac[-1], c_amm[-1], x_v[-1])
+    k_d = func.specific_death_rate(c_lac[-1], c_amm[-1], c_gln[-1])
 
     d_x_v = alpha * func.ddt_x_v(mu, k_d, x_v[-1])
     d_x_t = alpha * func.ddt_x_t(mu, x_v[-1])

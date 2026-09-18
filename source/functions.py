@@ -48,19 +48,7 @@ def f_x(x_v):
     return (x_v_ / (K_X + x_v_)) * (1 - x_v_ / X_M) ** N
 
 
-def beta(c_glc):
-    if c_glc > 5.4:
-        b = 0
-    else:
-        b = 1
-    return b
-
-
-def lac_switch(c_lac, c_glc):
-    return (c_lac / (K_L + c_lac)) * (K_GI / (K_GI + c_glc))
-
-
-def spec_growth(ph, temp, c_glc, c_gln, c_lac, c_amm, x_v, mode=2):
+def specific_growth_rate(ph, temp, c_glc, c_gln, c_lac, c_amm, x_v, mode=2):
     f_ph_ = f_ph(ph, ph_opt=7, ph_sd=1)
     f_temp_ = f_temp(temp, k_t=0.7, temp_min=0, temp_max=40)
     f_s_glc_ = f_s_glc(c_glc)
@@ -68,20 +56,16 @@ def spec_growth(ph, temp, c_glc, c_gln, c_lac, c_amm, x_v, mode=2):
     f_i_lac_ = f_i_lac(c_lac)
     f_i_amm_ = f_i_amm(c_amm)
     f_x_ = f_x(x_v)
+
     if mode == 1:
         return U_MAX * f_ph_ * f_temp_ * f_s_glc_ * f_s_gln_ * f_i_lac_ * f_i_amm_ * f_x_
     elif mode == 2:
         return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_) * f_i_lac_ * f_i_amm_ * f_x_
-    elif mode == 3:
-        if c_glc > 0.4:
-            return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_) * f_i_lac_ * f_i_amm_ * f_x_
-        else:
-            return U_MAX * f_ph_ * f_temp_ * (f_s_glc_ + f_s_gln_ + f_i_lac_) * f_i_amm_ * f_x_
     else:
         return None
 
 
-def spec_death(c_lac, c_amm, c_gln, mode=1):
+def specific_death_rate(c_lac, c_amm, c_gln, mode=1):
     if mode == 1:
         return K_D
     elif mode == 2:
@@ -92,20 +76,12 @@ def spec_death(c_lac, c_amm, c_gln, mode=1):
         return None
 
 
-def ddt_x_g(mu, x_v):
-    return mu * x_v
-
-
-def ddt_x_d(k_d, x_v):
-    return k_d * x_v
-
-
 def ddt_x_v(mu, k_d, x_v):
-    return ddt_x_g(mu, x_v) - ddt_x_d(k_d, x_v)
+    return mu * x_v - k_d * x_v
 
 
 def ddt_x_t(mu, x_v):
-    return ddt_x_g(mu, x_v)
+    return mu * x_v
 
 
 def ddt_glc(mu, x_v):
@@ -118,17 +94,15 @@ def ddt_gln(mu, x_v, c_gln):
     return d_gln
 
 
-def ddt_lac(c_lac, c_glc, mu, x_v, mode=3):
+def ddt_lac(c_lac, c_glc, mu, x_v, mode=2):
     if mode == 1:
-        return Y_LAC * (-ddt_glc(mu, x_v))
+        return Y_LAC * (mu / Y_GLC) * x_v
     elif mode == 2:
-        return (1 - beta(c_glc)) * Y_LAC * (-ddt_glc(mu, x_v)) - beta(c_glc) * 0.05 * Y_LAC * (U_MAX / Y_GLC) * x_v
-    elif mode == 3:
-        return Y_LAC * (-ddt_glc(mu, x_v)) - K_52 * U_MAX_2 * lac_switch(c_lac, c_glc)
+        return Y_LAC * (mu / Y_GLC) * x_v - K_52 * U_MAX_2 * (c_lac / (K_L + c_lac)) * (K_GI / (K_GI + c_glc))
     else:
         return None
 
 
 def ddt_amm(mu, x_v, c_gln):
-    d_amm = Y_AMM * (-ddt_gln(mu, x_v, c_gln)) + K_DECOMP * c_gln
+    d_amm = Y_AMM * (mu / Y_GLN) * x_v + K_DECOMP * c_gln
     return d_amm
