@@ -12,7 +12,6 @@ N = 1.330
 
 K_L = 0.003
 K_GI = 0.0103
-K_52 = 0.5091
 
 Y_GLC = 0.50 * 10 ** 6  # cells/mmol glc #49091.1
 Y_GLN = 2.00 * 10 ** 6  # cells/mmol gln
@@ -21,7 +20,7 @@ Y_LAC = 0.8  # mmol_lac/mmol_glc #1.49
 Y_AMM = 0.4  # mmol_amm/mmol_gln #1.21
 
 U_MAX = 2.09 / (24 * 3600)  # s-1
-U_MAX_2 = 0.8276 / (24 * 3600)
+U_MAX_LAC = 0.8276 / (24 * 3600) * 0.5091 * 10 ** (-6)
 C_LAC_MAX_THEORY = 1000  # mM
 C_AMM_MAX_THEORY = 500  # mM
 K_D_GLN = 0.02  # mM
@@ -33,7 +32,7 @@ K_DECOMP = 0.086 / (24 * 3600)  # s-1
 
 K_LAG = 6.67026
 
-LAG_TIME = 4 * 24 * 3600  # s, duration of lag phase
+LAG_TIME = 12 * 3600  # s, duration of lag phase
 STEADY_STATE_FRAC = 0.99
 
 DIR_FIGURES = 'figures'

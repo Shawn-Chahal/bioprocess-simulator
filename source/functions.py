@@ -98,7 +98,7 @@ def ddt_lac(c_lac, c_glc, mu, x_v, mode=2):
     if mode == 1:
         return Y_LAC * (mu / Y_GLC) * x_v
     elif mode == 2:
-        return Y_LAC * (mu / Y_GLC) * x_v - K_52 * U_MAX_2 * (c_lac / (K_L + c_lac)) * (K_GI / (K_GI + c_glc))
+        return Y_LAC * (mu / Y_GLC) * x_v - U_MAX_LAC * (c_lac / (K_L + c_lac)) * (K_GI / (K_GI + c_glc)) * x_v
     else:
         return None
 
