@@ -1,6 +1,6 @@
 import os
 
-from source.classes import Bioprocess
+from src.classes import Bioprocess
 
 bioprocess = Bioprocess()
 bioprocess.simulate()
