@@ -4,24 +4,40 @@ from typing import Optional
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.special import lambertw
+import os
 
 
 @dataclass
 class Bioprocess:
+    
     k_s_glc: float = 0.41  # mM
     k_s_gln: float = 2.04  # mM
     k_s_lac: float = 1.00  # mM
     k_i_lac: float = 258.0  # mM
     k_i_amm: float = 7.81  # mM
 
+
     k_x: float = 0.25 * 10 ** 6  # cells/mL
     x_m: float = 6 * 10 ** 6  # cells/mL
     n: float = 1.330
+    
 
     k_alpha: float = 1.0
 
     u_max: float = 2.09 / (24 * 3600)  # s^-1
     u_max_lac: float = 0.8276 / (24 * 3600) * 0.5091 * 10 ** (-6)
+
+    """" ajout recent """
+    toi: float = 48*3600
+    phi_tsi: float = 24*3600
+    F_virus: float = 1e9 
+
+
+ 
+
+    
+
+    
 
     k_d_0: float = 2.00 * 10 ** (-6)  # s^-1
     k_decomp: float = 0.086 / (24 * 3600)  # s^-1
@@ -30,6 +46,10 @@ class Bioprocess:
     k_d_gln: float = 0.02
     k_d_lac: float = 0.00209 / (24 * 3600)  # s^-1*mM^-1
     k_d_amm: float = 0.00418 / (24 * 3600)  # s^-1*mM^-1
+
+    C_inf: float = 6.7e-9/3600   # mL/(IVP*h)
+    K_D_I: float = 0.0332/3600   # 1/h, additional infected-cell mortality
+    p_inf: float = 100.0 /3600   # IVP/(cell*h), provisional assumption
 
     k_l: float = 0.003
     k_gi: float = 0.0103
@@ -59,6 +79,13 @@ class Bioprocess:
     c_amm: Optional[np.ndarray] = field(init=False, default=None)
     t: Optional[np.ndarray] = field(init=False, default=None)
 
+    x_u: Optional[np.ndarray] = field(init=False, default=None)
+    x_i: Optional[np.ndarray] = field(init=False, default=None)
+    x_d: Optional[np.ndarray] = field(init=False, default=None)
+    v_ex: Optional[np.ndarray] = field(init=False, default=None)
+
+
+    
     def simulate(
             self,
             ph=7,
@@ -67,45 +94,113 @@ class Bioprocess:
             c_gln_0=5,  # mM
             c_lac_0=0,  # mM
             c_amm_0=0,  # mM
-            x_0=1.0 * 10 ** 6,  # cells/ml
-            dt=60,  # s
-            t_f=3600 * 24 * 21  # s
+            x_0=1000000.0,  # cells/ml
+            dt=1,  # s
+            t_f= 3600 * 24 * 7,  # s
+            x_i_0 = 0,
+            x_d_0=0,
+            moi = 1.0, 
+          
+            
     ):
 
         t_0 = 0
+        x_u = [x_0]
+        x_i = [x_i_0]
+
+     
+
+      
+
+
+        x_d = [x_d_0]
+
+        
+        v_ex = [0.0]
 
         c_glc = [c_glc_0]
         c_gln = [c_gln_0]
         c_lac = [c_lac_0]
         c_amm = [c_amm_0]
         x_v = [x_0]
-        x_t = [x_0]
+        x_t = [x_0 ]
+        x_d = [x_d_0]
+        x_i = [x_i_0]
         t = [t_0]
+       
+
+
+     
 
         while t[-1] < t_f:
+            """ questions deçus """
+
             # TODO: Model lag phase better
             k_lag = np.log(1 - self.steady_state_frac) / (-self.lag_time)
             alpha = 1 - np.exp(-k_lag * t[-1])
 
+            #if not infected and t[-1]>toi : 
+                #infected = True 
+                #v_ex[-1]+= moi*x_v[-1]
+
+
+
+
+            
+
             mu, alpha_sgr = self.specific_growth_rate(ph, temp, c_glc[-1], c_gln[-1], c_lac[-1], c_amm[-1], x_v[-1])
             k_d = self.specific_death_rate(c_lac[-1], c_amm[-1], c_gln[-1])
 
-            d_x_v = alpha * self.ddt_x_v(mu, k_d, x_v[-1])
-            d_x_t = alpha * self.ddt_x_t(mu, x_v[-1])
+
+
+
+
+            j_inf = self.infection_rate(v_ex[-1], x_u[-1])
+            d_x_u = self.ddt_x_u(mu, k_d, x_u[-1], j_inf, alpha)
+            d_x_i = self.ddt_x_i(mu, k_d, x_i[-1], j_inf, alpha)
+            d_x_d = self.ddt_x_d(k_d, x_v[-1], x_i[-1], alpha)
+            #d_v_ex = self.ddt_v_ex(x_i[-1], j_inf, moi)
+            tsi = t[-1] - self.toi
+            d_v_ex = self.ddt_v_ex(x_i[-1], j_inf, moi, tsi)
+
+
+            #d_x_v = alpha * self.ddt_x_v(mu, k_d, x_v[-1])
+            #d_x_t = alpha * self.ddt_x_t(mu, x_v[-1])
             d_glc = alpha * self.ddt_glc(mu, x_v[-1], alpha_sgr)
             d_gln = alpha * self.ddt_gln(mu, x_v[-1], c_gln[-1])
             d_lac = alpha * self.ddt_lac(c_lac[-1], c_glc[-1], mu, x_v[-1], alpha_sgr)
             d_amm = alpha * self.ddt_amm(mu, x_v[-1], c_gln[-1])
 
             # Euler's method
-            x_v_next = max(0, x_v[-1] + d_x_v * dt)
-            x_t_next = max(0, x_t[-1] + d_x_t * dt)
+            """J'AI MIS ÇA EN COM POUR TESTER LE MIEN """
+            #x_v_next = max(0, x_v[-1] + d_x_v * dt). 
+
+            x_u_next = max(0,x_u[-1] + d_x_u * dt)
+            x_i_next = max(0, x_i[-1] + d_x_i * dt)
+            x_d_next = max(0, x_d[-1] + d_x_d * dt)
+            """ ajout recent """
+            v_ex_next = max(0, v_ex[-1] + d_v_ex * dt)
+            if t[-1] < self.toi <= t[-1] + dt:
+             v_ex_next += self.F_virus
+           
+
+            #x_t_next = max(0, x_t[-1] + d_x_t * dt)
             c_glc_next = max(0, c_glc[-1] + d_glc * dt)
             c_gln_next = max(0, c_gln[-1] + d_gln * dt)
             c_lac_next = max(0, c_lac[-1] + d_lac * dt)
             c_amm_next = max(0, c_amm[-1] + d_amm * dt)
 
+
+            x_v_next = x_u_next + x_i_next
+            x_t_next = x_v_next + x_d_next
+
             x_v.append(x_v_next)
+            x_u.append (x_u_next)
+            x_i.append(x_i_next)
+            x_d.append(x_d_next)
+            v_ex.append(v_ex_next)
+
+
             x_t.append(x_t_next)
             c_glc.append(c_glc_next)
             c_gln.append(c_gln_next)
@@ -121,9 +216,17 @@ class Bioprocess:
         self.c_amm = np.array(c_amm)
         self.t = np.array(t)
 
+        self.x_u = np.array(x_u)
+        self.x_i = np.array(x_i)
+        self.x_d = np.array(x_d)
+        self.v_ex = np.array(v_ex)
+
     def visualize(self, filepath, dpi=600):
-        fig, axes = plt.subplots(nrows=3, ncols=1, dpi=dpi, figsize=(6.5, 12), layout="constrained")
+        
+        fig, axes = plt.subplots(nrows=5, ncols=1, dpi=dpi, figsize=(7, 20), layout="constrained")
         line_style = dict(linestyle='-', marker='none')  # marker = 'o',  ms = 0.5, mec = '#000000'
+
+        #fig_adv, axes_adv = plt.subplots(nrows=2, ncols=1, dpi=dpi, figsize=(7, 9), layout="constrained")
 
         t_plot = np.array(self.t) / (24 * 3600)
         x_v_plot = np.array(self.x_v) / (10 ** 6)
@@ -147,9 +250,52 @@ class Bioprocess:
         axes[2].set_xlabel('Time [day]')
         axes[2].set_ylabel('Cell Viability')
 
-        fig.savefig(filepath)
-        plt.close(fig)
+        # Cell concentrations in million cells/mL
+        axes[3].plot(t_plot, self.x_u / 1e6, label="Uninfected cells")
+        axes[3].plot(t_plot, self.x_i / 1e6, label="Infected cells")
+        axes[3].plot(t_plot, self.x_d / 1e6, label="Dead cells")
+        axes[3].plot(t_plot, self.x_v / 1e6, label="Viable cells")
+        axes[3].plot(t_plot, self.x_t / 1e6, label="Total cells")
+        axes[3].set_xlabel("Time (days)")
+        axes[3].set_ylabel("Cell concentration (10^6 cells/mL)")
+        axes[3].set_title("HEK293 Cell Dynamics")
+        axes[3].legend(loc="upper left", fontsize=9)
+        axes[3].grid(True)
 
+        axes[4].set_xlabel("Time (days)")
+        axes[4].set_ylabel("Cell concentration (10^6 cells/mL)")
+        axes[4].set_title("HEK293 Cell Dynamics")
+        axes[4].legend()
+        axes[4].grid(True)
+
+        # Extracellular adenovirus
+        axes[4].plot(
+        t_plot,
+        self.v_ex,
+         label="Extracellular infectious adenovirus")
+
+
+        axes[4].set_xlabel("Time (days)")
+        axes[4].set_ylabel("Infectious virus (IVP/mL)")
+        axes[4].set_title("Extracellular Adenovirus Dynamics")
+        axes[4].legend()
+        axes[4].grid(True)
+
+       
+
+       
+        fig.savefig(filepath)
+
+        #base, ext = os.path.splitext(filepath)
+
+
+        #fig_adv.savefig(os.path.join("figures",f"{base}_adv{ext}"))
+        plt.close(fig)
+        #plt.close(fig_adv)
+        
+
+        
+        
     def f_ph(self, ph):
         return np.exp(-(ph - self.ph_opt) ** 2 / (2 * self.ph_sd ** 2))
 
@@ -222,11 +368,17 @@ class Bioprocess:
         else:
             return None
 
-    def ddt_x_v(self, mu, k_d, x_v):
-        return (mu - k_d) * x_v
+    #def ddt_x_v(self, mu, k_d, x_v):
+       # return (mu - k_d) * x_v
 
-    def ddt_x_t(self, mu, x_v):
-        return mu * x_v
+    #def ddt_x_t(self, mu, x_v):
+        #return mu * x_v
+
+    #def ddt_x_v(self, mu, k_d, x_v, x_i=0):
+        #return (mu - k_d) * x_v - self.K_D_I * x_i
+    
+    #def ddt_x_t(self, mu, x_v):
+        #return mu * x_v
 
     def ddt_glc(self, mu, x_v, alpha_sgr=None):
         if alpha_sgr is not None:
@@ -261,3 +413,37 @@ class Bioprocess:
     def ddt_amm(self, mu, x_v, c_gln):
         q_gln = mu / self.y_x_gln
         return self.y_amm_gln * q_gln * x_v + self.k_decomp * c_gln
+
+
+    def infection_rate(self, v_ex, x_u):
+        return self.C_inf * v_ex * x_u
+
+    def ddt_x_u(self, mu, k_d, x_v, j_inf, alpha=1.0):
+        return alpha * (mu - k_d) *x_v  - j_inf
+
+
+
+    def ddt_x_i(self, mu, k_d, x_i, j_inf, alpha=1.0):
+        return j_inf + alpha * (mu - k_d) * x_i - self.K_D_I * x_i
+
+    def ddt_x_d(self, k_d, x_v, x_i, alpha=1.0):
+        return alpha * k_d * x_v + self.K_D_I * x_i
+
+    def ddt_x_v(self, mu, k_d, x_u, j_inf, x_i=0, alpha=1.0):
+        return self.ddt_x_i( mu, k_d, x_i, j_inf, alpha ) + self.ddt_x_u(mu, k_d, x_u, j_inf, alpha)
+
+    def ddt_x_t(self, mu, x_v,k_d, x_u, j_inf, x_i=0, alpha=1.0):
+        return self.ddt_x_v( mu, k_d, x_u, j_inf, x_i, alpha) + self.ddt_x_d( k_d, x_v, x_i, alpha)
+
+    def ddt_v_ex(self, x_i, j_inf, moi, tsi):
+       if tsi >= self.phi_tsi:
+        production = self.p_inf * x_i
+       else:
+        production = 0.0
+
+       return production - moi * j_inf
+
+if __name__ == "__main__":
+    model = Bioprocess()
+    model.simulate(dt=60, t_f=7 * 24 * 3600)
+    model.visualize("simulation.png")
